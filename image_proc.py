@@ -9,13 +9,17 @@ path_on = 'imgs/002.jpg'
 img0 = cv.imread(path_off)
 img1 = cv.imread(path_on)
 
-# out = np.zeros(img0.shape)
-
 white = (255, 255, 255)
 
 
 def subc(rgb, a):
     return ((rgb[0] - a), (rgb[1] - a), (rgb[2] - a))
+
+
+mask_left = 180
+mask_cellw = 105
+mask_top = 280
+mask_cellh = 65
 
 
 def get_brightness_scores(img0, img1):
@@ -27,16 +31,20 @@ def get_brightness_scores(img0, img1):
     res = []
     decisions = []
 
-    for r in range(4):
-        for c in range(4):
+    for r in range(9):
+        for c in range(5):
             mask[:] = 0.0
-            mask[(180 + (105 * c)):(180 + (105 * (c + 1))),
-                 (280 + (65 * r)): (280 + (65 * (r + 1)))] = 255
+            mask[(mask_top + (mask_cellh * r)): (mask_top + (mask_cellh * (r + 1))),
+                 (mask_left + (mask_cellw * c)):(mask_left + (mask_cellw * (c + 1)))] = 255
             masked_img = cv.bitwise_and(diff, diff, mask=mask)
-            x0 = 180 + (105 * c)
-            y0 = 280 + (65 * r)
-            cv.line(diff, (180, y0), (600, y0), subc(white, (2*((r*4)+c))))
-            cv.line(diff, (x0, 280), (x0, 600), subc(white, (2*((r*4)+c))))
+            cv.imwrite('imgs/mask' + '_' + str(r) + '_' +
+                       str(c) + '_' + '.jpg', masked_img)
+            x0 = mask_left + (mask_cellw * c)
+            y0 = mask_top + (mask_cellh * r)
+            cv.line(diff, (mask_left, y0),
+                    (mask_left + (5 * mask_cellw), y0), white)
+            cv.line(diff, (x0, mask_top),
+                    (x0, mask_top + (9 * mask_cellh)), white)
 
             res += [np.average(masked_img)]
 

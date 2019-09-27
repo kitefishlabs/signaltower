@@ -1,31 +1,183 @@
 import os
 import time
+import random
 
 
 def init_grid(ingrid=None, **kwargs):
     val = kwargs['val']
     w = kwargs['w']
     h = kwargs['h']
-    return [[val for x in range(w)] for y in range(h)]
+    return [[val for x in range(w)] for col in range(h)]
 
 
 def idgrid(ingrid, **kwargs):
     return ingrid
 
 
-def addgrid(ingrid, **kwargs):
+def grid_allon(ingrid, **kwargs):
+    try:
+        val = kwargs['val']
+    except KeyError:
+        val = 255
+    return [[val for x in row] for row in ingrid]
+
+
+def grid_alloff(ingrid, **kwargs):
+    return [[0 for x in row] for row in ingrid]
+
+
+def grid_set(ingrid, **kwargs):
+    val = kwargs['val']
+    return [[val for x in row] for row in ingrid]
+
+
+def grid_setone(ingrid, **kwargs):
+    val = kwargs['val']
+    r = kwargs['r']
+    c = kwargs['c']
+    ingrid[r][c] = val
+    return ingrid
+
+
+def grid_add(ingrid, **kwargs):
     d = kwargs['d']
-    return [[v + d for v in yrow] for yrow in ingrid]
+    return [[val + d for val in row] for row in ingrid]
 
 
-def mingrid(ingrid, **kwargs):
+def grid_min(ingrid, **kwargs):
     upper = kwargs['upbnd']
-    return [[min(v, upper) for v in yrow] for yrow in ingrid]
+    return [[min(val, upper) for val in row] for row in ingrid]
 
 
-def maxgrid(ingrid, **kwargs):
+def grid_max(ingrid, **kwargs):
     lower = kwargs['lobnd']
-    return [[min(v, lower) for v in yrow] for yrow in ingrid]
+    return [[max(val, lower) for val in row] for row in ingrid]
+
+
+def grid_random(ingrid, **kwargs):
+    lobnd = kwargs['lobnd']
+    upbnd = kwargs['upbnd']
+    return [[random.randint(lobnd, upbnd) for x in row] for row in ingrid]
+
+
+def grid_random_single_point(ingrid, **kwargs):
+    lobnd = kwargs['lobnd']
+    upbnd = kwargs['upbnd']
+    w = len(ingrid[0])
+    h = len(ingrid)
+    c = random.randint(0, w - 1)
+    r = random.randint(0, h - 1)
+    res = [[0 for x in row] for row in ingrid]
+    res[r][c] = random.randint(lobnd, upbnd)
+    return res
+
+
+def grid_random_toggle_point(ingrid, **kwargs):
+    lobnd = min(max(kwargs['lobnd'], 0), 255)
+    upbnd = max(min(kwargs['upbnd'], 255), 0)
+    w = len(ingrid)
+    h = len(ingrid[0])
+    val = random.randint(0, 1) * random.randint(lobnd, upbnd)
+    c = random.randint(0, w - 1)
+    r = random.randint(0, h - 1)
+    res = ingrid
+    try:
+        res[r][c] = val
+    except IndexError:
+        print(c)
+        print(r)
+        print(val)
+        return
+    return res
+
+
+def chase(ingrid, **kwargs):
+    direction = 0
+    direction = kwargs['dir']
+    resi = kwargs['i']
+    resr = int(resi / 5)
+    resc = resi % 5
+
+    val = ingrid[resr][resc]
+    ingrid[resr][resc] = 0
+
+    if (direction == 0):
+
+        if (resr % 2) == 0:
+            if resc < 4:
+                r = resr
+                c = resc + 1
+            else:
+                r = resr + 1
+                c = resc
+        else:
+            if resc > 0:
+                r = resr
+                c = resc - 1
+            else:
+                r = resr + 1
+                c = resc
+
+    elif (direction == 1):
+
+        if (resr % 2) == 0:
+            if resc > 0:
+                r = resr
+                c = resc - 1
+            else:
+                r = resr - 1
+                c = resc
+        else:
+            if resc < 4:
+                r = resr
+                c = resc + 1
+            else:
+                r = resr - 1
+                c = resc
+
+    elif (direction == 2):
+
+        if (resc % 2) == 0:
+            if resr < 8:
+                r = resr + 1
+                c = resc
+            else:
+                r = resr
+                c = resc + 1
+        else:
+            if resr > 0:
+                r = resr - 1
+                c = resc
+            else:
+                r = resr
+                c = resc + 1
+
+    else:
+
+        if (resc % 2) == 0:
+            if resr > 0:
+                r = resr - 1
+                c = resc
+            else:
+                r = resr
+                c = resc - 1
+        else:
+            if resr < 8:
+                r = resr + 1
+                c = resc
+            else:
+                r = resr
+                c = resc - 1
+
+    if r < 0 or c < 0:
+        ingrid[8][4] = val
+
+    elif r > 8 or c > 4:
+        ingrid[0][0] = val
+    else:
+        ingrid[r][c] = val
+
+    return ingrid
 
 
 class GridState:
