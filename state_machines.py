@@ -2,12 +2,31 @@ import os
 import time
 import random
 
+import io
+# import picamera
+import cv2
+import numpy as np
+# from imutils.video import VideoStream
+# import imutils
+
+ROWS = 9
+COLS = 5
+
+
+# def routes = {
+#     0: []
+# }
+
+def get_(kwargs, key='val', default=None):
+    try:
+        return kwargs[key]
+    except KeyError:
+        return default
+
 
 def init_grid(ingrid=None, **kwargs):
-    val = kwargs['val']
-    w = kwargs['w']
-    h = kwargs['h']
-    return [[val for x in range(w)] for col in range(h)]
+    val = get_(kwargs, 'val', 127)
+    return [val for x in range(ROWS * COLS)]
 
 
 def idgrid(ingrid, **kwargs):
@@ -15,86 +34,101 @@ def idgrid(ingrid, **kwargs):
 
 
 def grid_allon(ingrid, **kwargs):
-    try:
-        val = kwargs['val']
-    except KeyError:
-        val = 255
-    return [[val for x in row] for row in ingrid]
+    val = get_(kwargs, 'val', 127)
+    return [val for i in range(ROWS * COLS)]
 
 
 def grid_alloff(ingrid, **kwargs):
-    return [[0 for x in row] for row in ingrid]
+    return [0 for i in range(ROWS * COLS)]
 
 
 def grid_set(ingrid, **kwargs):
-    val = kwargs['val']
-    return [[val for x in row] for row in ingrid]
+    val = get_(kwargs, 'val', 127)
+    return [val for i in range(ROWS * COLS)]
 
 
 def grid_setone(ingrid, **kwargs):
-    val = kwargs['val']
-    r = kwargs['r']
-    c = kwargs['c']
-    ingrid[r][c] = val
+    val = get_(kwargs, 'val', 127)
+    i = get_(kwargs, 'i')
+    if i is not None:
+        ingrid[i] = val
+    else:
+        print("warning: attempting to assign value where i == None; i:", i)
     return ingrid
 
 
 def grid_add(ingrid, **kwargs):
-    d = kwargs['d']
-    return [[val + d for val in row] for row in ingrid]
+    d = get_(kwargs, 'd', 1)
+    return [min(max((val + d), 0), 127) for val in ingrid]
 
 
 def grid_min(ingrid, **kwargs):
-    upper = kwargs['upbnd']
-    return [[min(val, upper) for val in row] for row in ingrid]
+    lower = min(max(get_(kwargs, 'lobnd', 0), 0), 127)
+    return [max(val, lower) for val in ingrid]
 
 
 def grid_max(ingrid, **kwargs):
-    lower = kwargs['lobnd']
-    return [[max(val, lower) for val in row] for row in ingrid]
+    upper = min(max(get_(kwargs, 'upbnd', 127), 0), 127)
+    return [min(val, upper) for val in ingrid]
 
 
-def grid_random(ingrid, **kwargs):
-    lobnd = kwargs['lobnd']
-    upbnd = kwargs['upbnd']
-    return [[random.randint(lobnd, upbnd) for x in row] for row in ingrid]
+def produce_one_random(lower, upper):
+    return random.randint(lower, upper)
+
+
+def grid_random(ingrid=None, **kwargs):
+    lower = min(max(get_(kwargs, 'lobnd', 0), 0), 127)
+    upper = min(max(get_(kwargs, 'upbnd', 127), 0), 127)
+    if ingrid is not None:
+        return [produce_one_random(lower, upper) for val in ingrid]
+    else:
+        res = init_grid(**{'val': 0})
+        return [produce_one_random(lower, upper) for val in res]
 
 
 def grid_random_single_point(ingrid, **kwargs):
-    lobnd = kwargs['lobnd']
-    upbnd = kwargs['upbnd']
-    w = len(ingrid[0])
-    h = len(ingrid)
-    c = random.randint(0, w - 1)
-    r = random.randint(0, h - 1)
-    res = [[0 for x in row] for row in ingrid]
-    res[r][c] = random.randint(lobnd, upbnd)
+    lower = min(max(get_(kwargs, 'lobnd', 0), 0), 127)
+    upper = min(max(get_(kwargs, 'upbnd', 127), 0), 127)
+    clear = get_(kwargs, 'clear', False)
+    random_i = random.randint(0, ((COLS * ROWS) - 1))
+    if clear:
+        res = grid_alloff(ingrid)
+    else:
+        res = ingrid
+    try:
+        res[random_i] = produce_one_random(lower, upper)
+    except IndexError:
+        print("grid_random_single_point failed for index: ", random_i)
     return res
 
 
 def grid_random_toggle_point(ingrid, **kwargs):
-    lobnd = min(max(kwargs['lobnd'], 0), 255)
-    upbnd = max(min(kwargs['upbnd'], 255), 0)
-    w = len(ingrid)
-    h = len(ingrid[0])
-    val = random.randint(0, 1) * random.randint(lobnd, upbnd)
-    c = random.randint(0, w - 1)
-    r = random.randint(0, h - 1)
+    lobnd = min(max(get_(kwargs, 'lobnd', 0), 0), 128)
+    upbnd = max(min(get_(kwargs, 'upbnd', 127), 128), 0)
+    random_pt = random.randint(lobnd, upbnd)
     res = ingrid
-    try:
-        res[r][c] = val
-    except IndexError:
-        print(c)
-        print(r)
-        print(val)
-        return
+    if res[random_pt] > 0:
+        res[random_pt] = 0
+    else:
+        try:
+            res[random_pt] = random.randint(lobnd, upbnd - 1)
+        except IndexError:
+            print(
+                "there was an index error in grid_random_toggle_point (r,c): (", r, ", ", c, ")")
+            pass
     return res
 
 
 def chase(ingrid, **kwargs):
     direction = 0
+    kwargs = kwargs['kwargs']
     direction = kwargs['dir']
-    resi = kwargs['i']
+    resi = 0
+    for i in range(45):
+        if (ingrid[int(i / 5)][i % 5] > 0):
+            resi = i
+            break
+    print('resi: ', resi)
     resr = int(resi / 5)
     resc = resi % 5
 
@@ -170,14 +204,70 @@ def chase(ingrid, **kwargs):
                 c = resc - 1
 
     if r < 0 or c < 0:
-        ingrid[8][4] = val
+        # ingrid[8][4] = val
+        return 44
 
     elif r > 8 or c > 4:
-        ingrid[0][0] = val
+        # ingrid[0][0] = val
+        return 0
     else:
-        ingrid[r][c] = val
+        # ingrid[r][c] = val
+        return (r * 9) + c
 
-    return ingrid
+    # return ingrid
+
+
+def grid_mirror(ingrid, **kwargs):
+    kwargs = kwargs['kwargs']
+    bthresh = kwargs['bthresh']
+    nrows = kwargs['nrows']
+    ncols = kwargs['ncols']
+    gtop = kwargs['gtop']
+    gleft = kwargs['gleft']
+    gheight = kwargs['gheight']
+    gwidth = kwargs['gwidth']
+    vs = kwargs['vs']
+    mask = kwargs['mask']
+    # grab the next frame from the stream
+    frame = kwargs['vs'].read()
+
+    # quit if there was a problem grabbing a frame
+    if frame is None:
+        return ingrid
+
+    # resize the frame and convert the frame to grayscale
+    frame = imutils.resize(frame, width=200)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # if the frame dimensions are empty, set them
+    # if W is None or H is None:
+    # (H, W) = frame.shape[:2]
+
+    res_ = [[0 for val in range(5)] for row in range(9)]
+    res = []
+    decisions = []
+
+    for r in range(nrows):
+        for c in range(ncols):
+            mask[:] = 0.0
+            mask[(gtop + (gheight * r)): (gtop + (gheight * (r + 1))),
+                 (gleft + (gwidth * c)): (gleft + (gwidth * (c + 1)))] = 255
+            masked_img = cv2.bitwise_and(gray, gray, mask=mask)
+            res += [np.average(masked_img)]
+
+            decisions = sorted([(a, b) for (a, b) in enumerate(
+                res) if b > bthresh], key=(lambda x: x[0]))
+    print("")
+    print(decisions)
+    print("")
+
+    for dec in decisions:
+        idx = dec[0]
+        r = int(idx / 5)
+        c = idx % 5
+        res_[r][c] = 127
+
+    return res_
 
 
 class GridState:
@@ -192,7 +282,7 @@ class GridState:
         self.h = self.params['gridh']
         self.grid = None
         self.grid = self.grid_apply_f(
-            init_grid, **{'w': self.w, 'h': self.h, 'val': 64})
+            init_grid, **{'w': self.w, 'h': self.h, 'val': 0})
 
     def _check_cf_params(self, params=None):
         """
